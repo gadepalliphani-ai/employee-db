@@ -1,0 +1,55 @@
+# CodeRabbit Configuration
+# https://coderabbit.ai
+
+language: "en"
+timezone: "America/Los_Angeles"
+
+review:
+  # What to review
+  paths:
+    include:
+      - "**/*.py"
+      - "**/*.sql"
+      - "**/*.md"
+    exclude:
+      - "**/__pycache__/**"
+      - "**/*.pyc"
+  
+  # Review focus areas
+  checklist:
+    - category: "Security"
+      items:
+        - "SQL injection prevention"
+        - "Input validation"
+        - "Error handling"
+    
+    - category: "Code Quality"
+      items:
+        - "Python best practices"
+        - "Database schema integrity"
+        - "Test coverage"
+    
+    - category: "Documentation"
+      items:
+        - "README updates"
+        - "Docstrings"
+        - "Type hints"
+
+  # Review settings
+  early_access: false
+  collapse_walkthrough: false
+  high_level_summary: true
+  poem: true
+
+chat: true
+auto_review:
+  enabled: true
+  ignore_title_keywords:
+    - "WIP"
+    - "DRAFT"
+  base_branches:
+    - "main"
+
+summarize:
+  enabled: true
+  publish_as: "comment"
