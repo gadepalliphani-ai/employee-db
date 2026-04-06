@@ -1,0 +1,49 @@
+name: Enforce Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  check-reviews:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for required reviews
+        id: check-reviews
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            const approvedReviews = reviews.filter(review => review.state === 'APPROVED');
+            
+            if (approvedReviews.length < 1) {
+              core.setFailed('❌ At least 1 approving review is required before merging.');
+              
+              // Add a comment to the PR
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '⚠️ **Review Required**: This PR needs at least 1 approving review before it can be merged.\n\nPlease request a review from a team member or use an AI code review tool.'
+              });
+            } else {
+              console.log('✅ PR has required reviews:', approvedReviews.length);
+            }
+      
+      - name: Check for AI review tools
+        if: steps.check-reviews.outcome == 'failure'
+        run: |
+          echo "Consider using these AI code review tools:"
+          echo "1. GitHub Copilot Chat - https://github.com/features/copilot"
+          echo "2. CodeRabbit - https://coderabbit.ai"
+          echo "3. CodiumAI - https://www.codium.ai"
+          echo "4. Sourcery - https://sourcery.ai"
+          echo ""
+          echo "To request a review, click 'Reviewers' in the PR sidebar."
