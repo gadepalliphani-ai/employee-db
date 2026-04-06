@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  employee-db:
+    build: .
+    container_name: employee-database
+    ports:
+      - "8000:8000"  # If you add a web interface
+    volumes:
+      - ./data:/app/data
+      - ./schema.sql:/app/schema.sql
+    environment:
+      - DATABASE_PATH=/app/data/employee.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; conn = sqlite3.connect('/app/data/employee.db'); conn.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

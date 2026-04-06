@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""
+Employee Database Application
+A simple CLI application to manage employee database.
+"""
+
+import sqlite3
+import os
+from typing import List, Dict, Any, Optional
+import sys
+
+class EmployeeDB:
+    """Employee database manager."""
+    
+    def __init__(self, db_path: str = "employee.db"):
+        self.db_path = db_path
+        self.init_db()
+    
+    def init_db(self):
+        """Initialize database with schema."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Read and execute schema
+        with open('schema.sql', 'r') as f:
+            schema = f.read()
+        
+        cursor.executescript(schema)
+        conn.commit()
+        conn.close()
+        print(f"Database initialized at {self.db_path}")
+    
+    def execute_query(self, query: str, params: tuple = ()) -> List[Dict[str, Any]]:
+        """Execute a query and return results as dictionaries."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute(query, params)
+            if query.strip().upper().startswith('SELECT'):
+                results = [dict(row) for row in cursor.fetchall()]
+            else:
+                conn.commit()
+                results = []
+            return results
+        finally:
+            conn.close()
+    
+    def add_employee(self, first_name: str, last_name: str, email: str, 
+                    hire_date: str, job_title: str, department_id: int, 
+                    salary: float, phone: str = None, manager_id: int = None) -> int:
+        """Add a new employee to the database."""
+        query = """
+        INSERT INTO employees 
+        (first_name, last_name, email, phone, hire_date, job_title, department_id, manager_id, salary)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        params = (first_name, last_name, email, phone, hire_date, job_title, department_id, manager_id, salary)
+        
+        self.execute_query(query, params)
+        
+        # Get the new employee ID
+        result = self.execute_query("SELECT last_insert_rowid() as id")
+        return result[0]['id']
+    
+    def get_employees(self, department_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get all employees, optionally filtered by department."""
+        if department_id:
+            query = """
+            SELECT e.*, d.department_name 
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.department_id
+            WHERE e.department_id = ?
+            ORDER BY e.last_name, e.first_name
+            """
+            return self.execute_query(query, (department_id,))
+        else:
+            query = """
+            SELECT e.*, d.department_name 
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.department_id
+            ORDER BY e.last_name, e.first_name
+            """
+            return self.execute_query(query)
+    
+    def get_departments(self) -> List[Dict[str, Any]]:
+        """Get all departments."""
+        return self.execute_query("SELECT * FROM departments ORDER BY department_name")
+    
+    def update_salary(self, employee_id: int, new_salary: float):
+        """Update an employee's salary and add to salary history."""
+        # Update current salary
+        query = "UPDATE employees SET salary = ? WHERE employee_id = ?"
+        self.execute_query(query, (new_salary, employee_id))
+        
+        # Add to salary history
+        query = """
+        INSERT INTO salaries (employee_id, salary, effective_date)
+        VALUES (?, ?, date('now'))
+        """
+        self.execute_query(query, (employee_id, new_salary))
+    
+    def get_department_stats(self) -> List[Dict[str, Any]]:
+        """Get statistics for each department."""
+        query = """
+        SELECT 
+            d.department_name,
+            COUNT(e.employee_id) as employee_count,
+            AVG(e.salary) as avg_salary,
+            MIN(e.salary) as min_salary,
+            MAX(e.salary) as max_salary
+        FROM departments d
+        LEFT JOIN employees e ON d.department_id = e.department_id
+        GROUP BY d.department_id, d.department_name
+        ORDER BY d.department_name
+        """
+        return self.execute_query(query)
+
+def main():
+    """Main CLI interface."""
+    db = EmployeeDB()
+    
+    print("Employee Database Management System")
+    print("=" * 40)
+    
+    while True:
+        print("\nOptions:")
+        print("1. List all employees")
+        print("2. List departments")
+        print("3. View department statistics")
+        print("4. Add new employee")
+        print("5. Update employee salary")
+        print("6. Exit")
+        
+        choice = input("\nEnter your choice (1-6): ").strip()
+        
+        if choice == '1':
+            employees = db.get_employees()
+            print(f"\nTotal employees: {len(employees)}")
+            for emp in employees:
+                print(f"{emp['employee_id']}: {emp['first_name']} {emp['last_name']} - {emp['job_title']} ({emp['department_name']}) - ${emp['salary']:,.2f}")
+        
+        elif choice == '2':
+            departments = db.get_departments()
+            print("\nDepartments:")
+            for dept in departments:
+                print(f"{dept['department_id']}: {dept['department_name']} - {dept['location']}")
+        
+        elif choice == '3':
+            stats = db.get_department_stats()
+            print("\nDepartment Statistics:")
+            for stat in stats:
+                print(f"{stat['department_name']}: {stat['employee_count']} employees, "
+                      f"Avg Salary: ${stat['avg_salary'] or 0:,.2f}")
+        
+        elif choice == '4':
+            print("\nAdd New Employee:")
+            first_name = input("First Name: ").strip()
+            last_name = input("Last Name: ").strip()
+            email = input("Email: ").strip()
+            phone = input("Phone (optional): ").strip() or None
+            hire_date = input("Hire Date (YYYY-MM-DD): ").strip()
+            job_title = input("Job Title: ").strip()
+            
+            # Show departments
+            departments = db.get_departments()
+            print("\nAvailable Departments:")
+            for dept in departments:
+                print(f"{dept['department_id']}: {dept['department_name']}")
+            
+            department_id = int(input("Department ID: ").strip())
+            salary = float(input("Salary: ").strip())
+            
+            employee_id = db.add_employee(
+                first_name, last_name, email, hire_date, job_title,
+                department_id, salary, phone
+            )
+            print(f"\nEmployee added successfully! ID: {employee_id}")
+        
+        elif choice == '5':
+            employee_id = int(input("Employee ID: ").strip())
+            new_salary = float(input("New Salary: ").strip())
+            db.update_salary(employee_id, new_salary)
+            print("Salary updated successfully!")
+        
+        elif choice == '6':
+            print("Goodbye!")
+            break
+        
+        else:
+            print("Invalid choice. Please try again.")
+
+if __name__ == "__main__":
+    main()
