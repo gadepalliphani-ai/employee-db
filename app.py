@@ -49,14 +49,16 @@ class EmployeeDB:
     
     def add_employee(self, first_name: str, last_name: str, email: str, 
                     hire_date: str, job_title: str, department_id: int, 
-                    salary: float, phone: str = None, manager_id: int = None) -> int:
+                    salary: float, work_mode: str = 'in-person', 
+                    phone: str = None, manager_id: int = None) -> int:
         """Add a new employee to the database."""
         query = """
         INSERT INTO employees 
-        (first_name, last_name, email, phone, hire_date, job_title, department_id, manager_id, salary)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (first_name, last_name, email, phone, hire_date, job_title, department_id, manager_id, salary, work_mode)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
-        params = (first_name, last_name, email, phone, hire_date, job_title, department_id, manager_id, salary)
+        params = (first_name, last_name, email, phone, hire_date, job_title, 
+                 department_id, manager_id, salary, work_mode)
         
         self.execute_query(query, params)
         
@@ -116,6 +118,21 @@ class EmployeeDB:
         ORDER BY d.department_name
         """
         return self.execute_query(query)
+    
+    def get_work_mode_stats(self) -> List[Dict[str, Any]]:
+        """Get statistics by work mode."""
+        query = """
+        SELECT 
+            COALESCE(work_mode, 'in-person') as work_mode,
+            COUNT(employee_id) as employee_count,
+            AVG(salary) as avg_salary,
+            MIN(salary) as min_salary,
+            MAX(salary) as max_salary
+        FROM employees
+        GROUP BY work_mode
+        ORDER BY work_mode
+        """
+        return self.execute_query(query)
 
 def main():
     """Main CLI interface."""
@@ -129,9 +146,10 @@ def main():
         print("1. List all employees")
         print("2. List departments")
         print("3. View department statistics")
-        print("4. Add new employee")
-        print("5. Update employee salary")
-        print("6. Exit")
+        print("4. View work mode statistics")
+        print("5. Add new employee")
+        print("6. Update employee salary")
+        print("7. Exit")
         
         choice = input("\nEnter your choice (1-6): ").strip()
         
@@ -139,7 +157,8 @@ def main():
             employees = db.get_employees()
             print(f"\nTotal employees: {len(employees)}")
             for emp in employees:
-                print(f"{emp['employee_id']}: {emp['first_name']} {emp['last_name']} - {emp['job_title']} ({emp['department_name']}) - ${emp['salary']:,.2f}")
+                work_mode_display = emp.get('work_mode', 'in-person').title()
+                print(f"{emp['employee_id']}: {emp['first_name']} {emp['last_name']} - {emp['job_title']} ({emp['department_name']}) - ${emp['salary']:,.2f} - {work_mode_display}")
         
         elif choice == '2':
             departments = db.get_departments()
@@ -155,6 +174,13 @@ def main():
                       f"Avg Salary: ${stat['avg_salary'] or 0:,.2f}")
         
         elif choice == '4':
+            stats = db.get_work_mode_stats()
+            print("\nWork Mode Statistics:")
+            for stat in stats:
+                print(f"{stat['work_mode'].title()}: {stat['employee_count']} employees, "
+                      f"Avg Salary: ${stat['avg_salary'] or 0:,.2f}")
+        
+        elif choice == '5':
             print("\nAdd New Employee:")
             first_name = input("First Name: ").strip()
             last_name = input("Last Name: ").strip()
@@ -171,20 +197,23 @@ def main():
             
             department_id = int(input("Department ID: ").strip())
             salary = float(input("Salary: ").strip())
+            work_mode = input("Work Mode (remote/in-person/hybrid, default: in-person): ").strip()
+            if work_mode not in ['remote', 'in-person', 'hybrid']:
+                work_mode = 'in-person'
             
             employee_id = db.add_employee(
                 first_name, last_name, email, hire_date, job_title,
-                department_id, salary, phone
+                department_id, salary, work_mode, phone
             )
             print(f"\nEmployee added successfully! ID: {employee_id}")
         
-        elif choice == '5':
+        elif choice == '6':
             employee_id = int(input("Employee ID: ").strip())
             new_salary = float(input("New Salary: ").strip())
             db.update_salary(employee_id, new_salary)
             print("Salary updated successfully!")
         
-        elif choice == '6':
+        elif choice == '7':
             print("Goodbye!")
             break
         
