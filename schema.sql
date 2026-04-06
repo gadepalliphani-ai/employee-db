@@ -21,6 +21,7 @@ CREATE TABLE employees (
     department_id INTEGER REFERENCES departments(department_id),
     manager_id INTEGER REFERENCES employees(employee_id),
     salary REAL CHECK (salary >= 0),
+    work_mode TEXT CHECK (work_mode IN ('remote', 'in-person', 'hybrid')) DEFAULT 'in-person',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -49,12 +50,12 @@ INSERT INTO departments (department_name, location) VALUES
     ('Finance', 'Boston');
 
 -- Sample employees
-INSERT INTO employees (first_name, last_name, email, phone, hire_date, job_title, department_id, salary) VALUES
-    ('John', 'Doe', 'john.doe@company.com', '555-0101', '2023-01-15', 'Software Engineer', 1, 85000.00),
-    ('Jane', 'Smith', 'jane.smith@company.com', '555-0102', '2022-03-20', 'Senior Engineer', 1, 110000.00),
-    ('Bob', 'Johnson', 'bob.johnson@company.com', '555-0103', '2021-06-10', 'Sales Manager', 2, 95000.00),
-    ('Alice', 'Williams', 'alice.williams@company.com', '555-0104', '2020-11-05', 'Marketing Director', 3, 120000.00),
-    ('Charlie', 'Brown', 'charlie.brown@company.com', '555-0105', '2023-08-22', 'HR Specialist', 4, 65000.00);
+INSERT INTO employees (first_name, last_name, email, phone, hire_date, job_title, department_id, salary, work_mode) VALUES
+    ('John', 'Doe', 'john.doe@company.com', '555-0101', '2023-01-15', 'Software Engineer', 1, 85000.00, 'hybrid'),
+    ('Jane', 'Smith', 'jane.smith@company.com', '555-0102', '2022-03-20', 'Senior Engineer', 1, 110000.00, 'remote'),
+    ('Bob', 'Johnson', 'bob.johnson@company.com', '555-0103', '2021-06-10', 'Sales Manager', 2, 95000.00, 'in-person'),
+    ('Alice', 'Williams', 'alice.williams@company.com', '555-0104', '2020-11-05', 'Marketing Director', 3, 120000.00, 'hybrid'),
+    ('Charlie', 'Brown', 'charlie.brown@company.com', '555-0105', '2023-08-22', 'HR Specialist', 4, 65000.00, 'in-person');
 
 -- Update manager relationships
 UPDATE employees SET manager_id = 2 WHERE employee_id = 1; -- John reports to Jane

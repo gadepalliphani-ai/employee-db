@@ -40,7 +40,8 @@ class TestEmployeeDB:
             hire_date="2024-01-01",
             job_title="Tester",
             department_id=1,
-            salary=50000.00
+            salary=50000.00,
+            work_mode='remote'
         )
         
         # SQLite returns rowid, should be > 0 if inserted successfully
@@ -106,6 +107,19 @@ class TestEmployeeDB:
         engineering = next(s for s in stats if s['department_name'] == 'Engineering')
         assert engineering['employee_count'] == 2
         assert engineering['avg_salary'] > 0
+    
+    def test_get_work_mode_stats(self, db):
+        """Test work mode statistics."""
+        stats = db.get_work_mode_stats()
+        
+        # Should have stats for each work mode
+        work_modes = {s['work_mode'] for s in stats}
+        expected_modes = {'remote', 'in-person', 'hybrid'}
+        assert expected_modes.issubset(work_modes)
+        
+        # Check that we have counts
+        for stat in stats:
+            assert stat['employee_count'] >= 0
     
     def test_add_employee_validation(self, db):
         """Test employee validation (email uniqueness)."""
