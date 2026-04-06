@@ -121,6 +121,59 @@ class TestEmployeeDB:
         for stat in stats:
             assert stat['employee_count'] >= 0
     
+    def test_update_salary_with_bonus(self, db):
+        """Test updating salary with performance bonus."""
+        # Get first employee
+        employees = db.get_employees()
+        employee_id = employees[0]['employee_id']
+        old_salary = employees[0]['salary']
+        
+        # Update salary with bonus
+        new_salary = old_salary + 10000
+        performance_bonus = 5000
+        bonus_notes = "Excellent performance Q4"
+        
+        db.update_salary(employee_id, new_salary, performance_bonus, bonus_notes)
+        
+        # Verify update
+        updated_employees = db.get_employees()
+        updated_emp = next(e for e in updated_employees if e['employee_id'] == employee_id)
+        
+        assert updated_emp['salary'] == new_salary
+        
+        # Check salary history with bonus
+        salaries = db.execute_query(
+            "SELECT * FROM salaries WHERE employee_id = ? ORDER BY effective_date DESC",
+            (employee_id,)
+        )
+        assert len(salaries) >= 1
+        assert salaries[0]['salary'] == new_salary
+        assert salaries[0]['performance_bonus'] == performance_bonus
+        assert salaries[0]['bonus_notes'] == bonus_notes
+    
+    def test_get_bonus_stats(self, db):
+        """Test bonus statistics."""
+        stats = db.get_bonus_stats()
+        
+        # Should have stats for employees with bonuses
+        assert len(stats) >= 5  # At least our sample employees
+        
+        # Check that sample bonuses are included
+        total_bonuses = sum(s['total_bonus'] for s in stats)
+        assert total_bonuses > 0
+    
+    def test_get_department_bonus_stats(self, db):
+        """Test department bonus statistics."""
+        stats = db.get_department_bonus_stats()
+        
+        # Should have stats for each department
+        assert len(stats) == 5  # One for each department
+        
+        # Check that bonuses are calculated
+        engineering = next(s for s in stats if s['department_name'] == 'Engineering')
+        assert engineering['total_bonus'] > 0
+        assert engineering['bonus_percentage'] > 0
+    
     def test_add_employee_validation(self, db):
         """Test employee validation (email uniqueness)."""
         # Add first employee
@@ -154,12 +207,25 @@ def test_cli_interface():
     """Test CLI interface (basic smoke test)."""
     # This is a simple smoke test to ensure the CLI doesn't crash
     import subprocess
-    result = subprocess.run(
-        ['python', '-c', 'from app import EmployeeDB; db = EmployeeDB("test.db"); print("OK")'],
-        capture_output=True,
-        text=True
-    )
-    assert result.returncode == 0 or "OK" in result.stdout
+    import tempfile
+    import os
+    
+    # Create a temporary file for the test database
+    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+        db_path = tmp.name
+    
+    try:
+        result = subprocess.run(
+            ['python', '-c', f'from app import EmployeeDB; db = EmployeeDB("{db_path}"); print("OK")'],
+            capture_output=True,
+            text=True
+        )
+        # Check if it ran without critical errors
+        assert "OK" in result.stdout or result.returncode == 0
+    finally:
+        # Clean up
+        if os.path.exists(db_path):
+            os.unlink(db_path)
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
