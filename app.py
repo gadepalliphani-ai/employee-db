@@ -90,7 +90,7 @@ class EmployeeDB:
         """Get all departments."""
         return self.execute_query("SELECT * FROM departments ORDER BY department_name")
     
-    def update_salary(self, employee_id: int, new_salary: float, performance_bonus: float = 0, 
+    def update_salary(self, employee_id: int, new_salary: float, performance_bonus: float = 0,
                      bonus_notes: str = None):
         """Update an employee's salary and add to salary history with optional bonus."""
         # Update current salary
@@ -165,7 +165,11 @@ class EmployeeDB:
             COALESCE(SUM(s.performance_bonus), 0) as total_bonus,
             COALESCE(AVG(s.performance_bonus), 0) as avg_bonus,
             COALESCE(MAX(s.performance_bonus), 0) as max_bonus,
-            COALESCE(SUM(s.performance_bonus) * 100.0 / NULLIF(SUM(e.salary), 0), 0) as bonus_percentage
+            CASE 
+                WHEN COALESCE(SUM(e.salary), 0) > 0 
+                THEN COALESCE(SUM(s.performance_bonus), 0) * 100.0 / SUM(e.salary)
+                ELSE 0 
+            END as bonus_percentage
         FROM departments d
         LEFT JOIN employees e ON d.department_id = e.department_id
         LEFT JOIN salaries s ON e.employee_id = s.employee_id AND s.performance_bonus > 0
@@ -173,6 +177,44 @@ class EmployeeDB:
         ORDER BY total_bonus DESC
         """
         return self.execute_query(query)
+
+def get_valid_int(prompt: str, min_val: int = None, max_val: int = None) -> int:
+    """Get a valid integer input with validation."""
+    while True:
+        try:
+            value = int(input(prompt).strip())
+            if min_val is not None and value < min_val:
+                print(f"Value must be at least {min_val}. Try again.")
+                continue
+            if max_val is not None and value > max_val:
+                print(f"Value must be at most {max_val}. Try again.")
+                continue
+            return value
+        except ValueError:
+            print("Invalid input. Please enter a valid integer.")
+
+def get_valid_float(prompt: str, min_val: float = None, max_val: float = None) -> float:
+    """Get a valid float input with validation."""
+    while True:
+        try:
+            value = float(input(prompt).strip())
+            if min_val is not None and value < min_val:
+                print(f"Value must be at least {min_val}. Try again.")
+                continue
+            if max_val is not None and value > max_val:
+                print(f"Value must be at most {max_val}. Try again.")
+                continue
+            return value
+        except ValueError:
+            print("Invalid input. Please enter a valid number.")
+
+def get_valid_choice(prompt: str, valid_choices: list) -> str:
+    """Get a valid choice from a list of options."""
+    while True:
+        choice = input(prompt).strip()
+        if choice in valid_choices:
+            return choice
+        print(f"Invalid choice. Valid options are: {', '.join(valid_choices)}")
 
 def main():
     """Main CLI interface."""
@@ -259,10 +301,13 @@ def main():
             for dept in departments:
                 print(f"{dept['department_id']}: {dept['department_name']}")
             
-            department_id = int(input("Department ID: ").strip())
-            salary = float(input("Salary: ").strip())
-            work_mode = input("Work Mode (remote/in-person/hybrid, default: in-person): ").strip()
-            if work_mode not in ['remote', 'in-person', 'hybrid']:
+            department_id = get_valid_int("Department ID: ", min_val=1)
+            salary = get_valid_float("Salary: ", min_val=0)
+            work_mode = get_valid_choice(
+                "Work Mode (remote/in-person/hybrid, default: in-person): ", 
+                ['remote', 'in-person', 'hybrid', '']
+            )
+            if not work_mode:
                 work_mode = 'in-person'
             
             employee_id = db.add_employee(
@@ -272,16 +317,17 @@ def main():
             print(f"\nEmployee added successfully! ID: {employee_id}")
         
         elif choice == '8':
-            employee_id = int(input("Employee ID: ").strip())
-            new_salary = float(input("New Salary: ").strip())
-            include_bonus = input("Include performance bonus? (y/n): ").strip().lower()
+            employee_id = get_valid_int("Employee ID: ", min_val=1)
+            new_salary = get_valid_float("New Salary: ", min_val=0)
+            include_bonus = get_valid_choice("Include performance bonus? (y/n): ", ['y', 'n'])
             
             performance_bonus = 0
             bonus_notes = None
             
             if include_bonus == 'y':
-                performance_bonus = float(input("Performance Bonus Amount: ").strip())
-                bonus_notes = input("Bonus Notes (optional): ").strip() or None
+                performance_bonus = get_valid_float("Performance Bonus Amount: ", min_val=0)
+                bonus_notes_input = input("Bonus Notes (optional): ").strip()
+                bonus_notes = bonus_notes_input if bonus_notes_input else None
             
             db.update_salary(employee_id, new_salary, performance_bonus, bonus_notes)
             print("Salary updated successfully!")
